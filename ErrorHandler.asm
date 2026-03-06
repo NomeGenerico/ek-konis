@@ -102,20 +102,19 @@ jmp main
 
 			DigitHexFinder_SkipShift:
 			loadn r4, #"0"
-			add r3, r3, r4  ; add num to the char for 0, with the proper handling of 9 -> A
+			add r3, r3, r4  ; add num to the char for 0, with the proper handling of 7,8,9 -> A,B,C 
 			pop r4
 			rts
 
 
 	; Public:
 		
-		CallError:  ; <ERRORID>   ; Clobers r0 and r1. IF you neeed their data, get it before this runs
+		CallError:  ; <ERRORID>, < >   ; Clobers r0 and r1. IF you neeed their data, get it before this runs
 
 
 			call PrintYellowScreen
 			call PrintErrorMessage ; clobers r0
 
-			; r0 = Last Printed Position On Screen + 1, Ofset PC print by it
 			; retrieve PC from stack
 			
 			pop r1
@@ -127,7 +126,7 @@ jmp main
 
 
 
-		PrintHexNumberOnScreen: ; <Index, Number>
+		PrintHexNumberOnScreen: ; <Index, Number>, < >   ; Prints On Screen
 
 			; r0 is the Index to print the number
 			loadn r3, "x"
@@ -164,14 +163,14 @@ jmp main
 			rts
 
 
-		CheckOverFlow: ; <ERRORID, Size, Buffer*, BufferSize, BufferPointer >  Used By the Memory Handler
+		CheckOverFlow: ; <ERRORID, Size, Buffer*, BufferSize, BufferPointer >, < >  Used By the Memory Handler
 
 			push r1
 			push r2
 			push r3
 			push r4
 
-			;r0 = ERRORID
+			;r0 = ERRORID   ; Create Your Own Message to specify wich buffer it is.
 			;r1 = Size of Object
 
 			add r1, r1, r4  ; BufferPointer + Size
@@ -210,7 +209,6 @@ jmp main
 	; Simply declare a String and add it to the Error MessageTable. The value in the + #num will be the Error ID.
 	; 
 		TestError : string "This is a Error Mesage, PC that called the error: "
-		OutOfBoundsCodeError : string "The Code Went Out Of bounds"
 		BufferOverFlowError1 : string "The OverFlow Function Failed: Test1.    PC:"
 		BufferOverFlowError2 : string "The OverFlow Function Failed: Test2.    PC:"
 		BufferOverFlowError3 : string "The OverFlow Function Failed: Test3.    PC:"
@@ -223,7 +221,6 @@ jmp main
 	ErrorMessageTable: var #256
 
 		static ErrorMessageTable + #0, #TestError
-		static ErrorMessageTable + #1, #OutOfBoundsCodeError
 		static ErrorMessageTable + #10, #BufferOverFlowError1
 		static ErrorMessageTable + #11, #BufferOverFlowError2
 		static ErrorMessageTable + #12, #BufferOverFlowError3
@@ -276,19 +273,19 @@ jmp main
 	; Cleanup Functions
 		CleanScreen: 
 
-		loadn r0, #0  ; void
-		loadn r1, #0
-		loadn r2, #1200
+			loadn r0, #0  ; void
+			loadn r1, #0
+			loadn r2, #1200
 
-		CleanScreen_loop:
-		cmp r1, r2
-		jeq CleanScreen_Exit
-		outchar r0, r1
-		inc r1
-		jmp CleanScreen_loop
-		CleanScreen_Exit:
+			CleanScreen_loop:
+			cmp r1, r2
+			jeq CleanScreen_Exit
+			outchar r0, r1
+			inc r1
+			jmp CleanScreen_loop
+			CleanScreen_Exit:
 
-		rts
+			rts
 
 
 
@@ -306,57 +303,57 @@ jmp main
 			static TestBufferPointer + #0, #TestBuffer
 
 		;DO NOT COPY
-		main:
-		call CleanScreen
-		; setup BufferOverFlow
+	main:
+	call CleanScreen
+	; setup BufferOverFlow
 
-				loadn r0, #1900
-				load r1, TestBufferPointer
-				add r1, r1, r0
-				store TestBufferPointer, r1
+			loadn r0, #1900
+			load r1, TestBufferPointer
+			add r1, r1, r0
+			store TestBufferPointer, r1
 
-			; Test1   ; Alocated Up to Boundry
-				loadn r0, #10 ; Error ID
-				loadn r1, #100 ; size of alocation
-				loadn r2, #TestBuffer
-				load r3, TestBufferSize
-				load r4, TestBufferPointer
+		; Test1   ; Alocated Up to Boundry
+			loadn r0, #10 ; Error ID
+			loadn r1, #100 ; size of alocation
+			loadn r2, #TestBuffer
+			load r3, TestBufferSize
+			load r4, TestBufferPointer
 
-				call CheckOverFlow    ; expected pass 
+			call CheckOverFlow    ; expected pass 
 			
-			; Test2 - Clear overflow, should error
-				loadn r0, #11
-				loadn r1, #200        ; size too big
-				loadn r2, #TestBuffer
-				load r3, TestBufferSize
-				load r4, TestBufferPointer  ; still at 1900
-				call CheckOverFlowReversed    ; expected error so we use reverse, to allow tests to continue
+		; Test2 - Clear overflow, should error
+			loadn r0, #11
+			loadn r1, #200        ; size too big
+			loadn r2, #TestBuffer
+			load r3, TestBufferSize
+			load r4, TestBufferPointer  ; still at 1900
+			call CheckOverFlowReversed    ; expected error so we use reverse, to allow tests to continue
 
-			; Test3 - Pointer at start, small allocation, should pass
-				loadn r0, #12
-				loadn r1, #10
-				loadn r2, #TestBuffer
-				load r3, TestBufferSize
-				loadn r4, #TestBuffer  ; pointer at start
-				call CheckOverFlow    ; expected pass
+		; Test3 - Pointer at start, small allocation, should pass
+			loadn r0, #12
+			loadn r1, #10
+			loadn r2, #TestBuffer
+			load r3, TestBufferSize
+			loadn r4, #TestBuffer  ; pointer at start
+			call CheckOverFlow    ; expected pass
 
-			; Test4 - Pointer at start, allocation larger than buffer, should error
-				loadn r0, #13
-				loadn r1, #2001
-				loadn r2, #TestBuffer
-				load r3, TestBufferSize
-				loadn r4, #TestBuffer
-				call CheckOverFlowReversed    ; expected error so we use reverse, to allow tests to continue
+		; Test4 - Pointer at start, allocation larger than buffer, should error
+			loadn r0, #13
+			loadn r1, #2001
+			loadn r2, #TestBuffer
+			load r3, TestBufferSize
+			loadn r4, #TestBuffer
+			call CheckOverFlowReversed    ; expected error so we use reverse, to allow tests to continue
 
-			; Test5 - Pointer already past buffer end, should error
-				loadn r0, #14
-				loadn r1, #1
-				loadn r2, #TestBuffer
-				load r3, TestBufferSize
-				load r4, TestBufferPointer  ; still at 1900+100 range
-				loadn r5, #300
-				add r4, r4, r5
-				call CheckOverFlowReversed    ; expected error so we use reverse, to allow tests to continue
+		; Test5 - Pointer already past buffer end, should error
+			loadn r0, #14
+			loadn r1, #1   ; alocate a single word
+			loadn r2, #TestBuffer
+			load r3, TestBufferSize
+			load r4, TestBufferPointer  ; still at 1900 range
+			loadn r5, #300
+			add r4, r4, r5  ; Buffer Pointer Is now Buffer + 2200
+			call CheckOverFlowReversed    ; expected error so we use reverse, to allow tests to continue
 
 			; All Tests Passed
 				loadn r0, #100
