@@ -3,7 +3,7 @@ push r0    ; stop stack overflow
 jmp main
 
 
-;--------- ErrorSystem     Version 0.15
+;--------- ErrorSystem     Version 0.2
 ;
 ;	Minimalist Suit To Allow For Easier Error Catching: 
 ; 	Is required in all my libraries to allow you to know imediatly 
@@ -128,6 +128,7 @@ jmp main
 				; if r2 = 65534, exit beacuse we reached the end of the stack
 					dec r3
 					cmp r2, r3
+					jeq TraceStack_exit
 
 				jmp TraceStack_loop
 				TraceStack_getstack:
