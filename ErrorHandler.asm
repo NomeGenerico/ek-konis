@@ -3,7 +3,7 @@ push r0    ; stop stack overflow
 jmp main
 
 
-;--------- ErrorSystem     Version 0.15
+;--------- ErrorSystem     Version 0.1.5
 ;
 ;	Minimalist Suit To Allow For Easier Error Catching: 
 ; 	Is required in all my libraries to allow you to know imediatly 
