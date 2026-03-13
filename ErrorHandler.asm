@@ -1,7 +1,9 @@
+loadn r0, #65534
+push r0    ; stop stack overflow
 jmp main
 
 
-;--------- ErrorSystem     Version 0.1
+;--------- ErrorSystem     Version 0.15
 ;
 ;	Minimalist Suit To Allow For Easier Error Catching: 
 ; 	Is required in all my libraries to allow you to know imediatly 
@@ -9,7 +11,7 @@ jmp main
 ;
 ;	Error Mesages and ErrorMessageTables can be moved at will, but they must exist somewhere
 ;	
-;	The Usage Is prety simple, Define Error Mesages and Assing them to IDs. Call "CallError" with the IDs to get a 
+;	The Usage Is prety simple, Define Error Mesages and Assing them to IDs. Call "CallFatalError" with the IDs to get a 
 ;	Yellow Screen Of Death (YSOD)
 ;
 ; 	Some Other Functions may also provided, They are mainly used for my other libraries but are general error cheking tha you can use. 
@@ -56,6 +58,8 @@ jmp main
 			push r3
 			push r4
 			push r5
+
+			loadn r5, #0   ; stops garbage
 
 
 			loadn r1, #ErrorMessageTable
@@ -106,30 +110,62 @@ jmp main
 			pop r4
 			rts
 
+		TraceStack:    ; Only gets called on Fatal Error
+
+			pop r5
+			loadn r3, #65535
+			loadn r4, #100
+
+			TraceStack_loop:
+
+
+				; if r2 = 65535, exit loop with next word of memory in the stack
+
+					pop r2
+					cmp r2, r3
+					jeq TraceStack_getstack
+
+				; if r2 = 65534, exit beacuse we reached the end of the stack
+					dec r3
+					cmp r2, r3
+
+				jmp TraceStack_loop
+				TraceStack_getstack:
+			pop r1    ; if found, update address
+						  ; Else Exit
+			TraceStack_exit:
+			push r5
+			rts
+
+
 
 	; Public:
-		
-		CallError:  ; <ERRORID>, < >   ; Clobers r0 and r1. IF you neeed their data, get it before this runs
+		CallI:   ; < r7 = Which Function To Call (Pointer) >
+			push r7
+			rts
+		CallFatalError:  ; <ERRORID, Reserved>, < >   ;
 
 
 			call PrintYellowScreen
-			call PrintErrorMessage ; clobers r0
+			call PrintErrorMessage ; Puts
 
 			; retrieve PC from stack
 			
 			pop r1
+
+			; try to find stack marker
+
+			call TraceStack
 
 			call PrintHexNumberOnScreen
 			; Print PC after the message
 
 			halt
 
-
-
 		PrintHexNumberOnScreen: ; <Index, Number>, < >   ; Prints On Screen
 
 			; r0 is the Index to print the number
-			loadn r3, "x"
+			loadn r3, #"x"
 			outchar r3, r0
 			inc r0
 
@@ -163,41 +199,147 @@ jmp main
 			rts
 
 
-		CheckOverFlow: ; <ERRORID, Size, Buffer*, BufferSize, BufferPointer >, < >  Used By the Memory Handler
+		CheckOverFlowSafe: ; <   , Size, Buffer*, BufferSize, BufferPointer >, < r2 = Error or not>  Used By the Memory Handler 
 
 			push r1
-			push r2
 			push r3
 			push r4
 
-			;r0 = ERRORID   ; Create Your Own Message to specify wich buffer it is.
 			;r1 = Size of Object
 
 			add r1, r1, r4  ; BufferPointer + Size
 			add r2, r2, r3  ; Buffer + BufferSize
 
 			cmp r1, r2
-			jel CheckOverFlow_END
+			jel CheckOverFlowSafe_END
 
-				Call CallError
+				loadn r2, #1
 
 				pop r4
 				pop r3
-				pop r2
 				pop r1
 
 
 				rts
 				
-			CheckOverFlow_END:
+			CheckOverFlowSafe_END:
 
+			loadn r2, #0
+
+			pop r4
+			pop r3
+			pop r1
+
+
+			rts
+
+		CheckOverFlow:   ; <  ErrorID , Size, Buffer*, BufferSize, BufferPointer > , <   >
+
+			push r1
+			push r2
+			push r3
+			push r4
+
+			Call CheckOverFlowSafe
+
+			mov r1, r2
+			call CheckIfZero   ; Errors if not zero
+			
+			pop r4
+			pop r3
+			pop r2
+			pop r1
+			
+			rts
+
+		MemCompare: ; <*mem1 , *mem2, size> , < Equal (0 or 1)>  , 1 if equal, 0 if different  ; safe
+
+			push r1
+			push r2
+			push r3
+			push r4
+			push r5
+
+			loadn r5, #0
+
+			MemCompare_loop:
+
+				loadi r3, r0
+				loadi r4, r1
+				cmp r3, r4
+				jeq MemCompare_equal
+
+				loadn r0, #0
+				jmp MemCompare_exit
+
+				MemCompare_equal:
+
+				inc r0
+				inc r1
+				dec r2
+				cmp r2, r5
+				jne MemCompare_loop
+			loadn r0, #1
+			MemCompare_exit:
+
+			pop r5
 			pop r4
 			pop r3
 			pop r2
 			pop r1
 
-
 			rts
+		CheckIfOne: ; <Error ID, r1 = variable> , < >
+			push r1
+			push r2
+
+			loadn r2, #1
+			cmp r1, r2
+			jne CheckIfOne_error
+
+				pop r2
+				pop r1
+				rts
+
+			CheckIfOne_error:
+
+				pop r2
+				pop r1
+				call CallFatalError
+
+
+		CheckIfZero: ; <Error ID, r1 = variable> , < >
+			push r1
+			push r2
+
+			loadn r2, #0
+			cmp r1, r2
+			jne CheckIfZero_error
+
+				pop r2
+				pop r1
+				rts
+
+			CheckIfZero_error:
+
+				pop r2
+				pop r1
+				call CallFatalError
+		;Untested
+		ErrorAwareCall: ;  < ErrorID, r7 = Which Function to Call (Pointer) > Clobers r1, make sure to save it before calling it. 
+
+			push r1
+			loadn r1, #65535   ; marker for call, to guarantee to find the original functions addres
+			push r1
+
+			call CallI   ; will call whatver is in r7
+
+			pop r1
+			pop r1
+			rts
+
+
+
 
 
 
@@ -209,30 +351,43 @@ jmp main
 	; Simply declare a String and add it to the Error MessageTable. The value in the + #num will be the Error ID.
 	; 
 		TestError : string "This is a Error Mesage, PC that called the error: "
-		BufferOverFlowError1 : string "The OverFlow Function Failed: Test1.    PC:"
-		BufferOverFlowError2 : string "The OverFlow Function Failed: Test2.    PC:"
-		BufferOverFlowError3 : string "The OverFlow Function Failed: Test3.    PC:"
-		BufferOverFlowError4 : string "The OverFlow Function Failed: Test4.    PC:"
-		BufferOverFlowError5 : string "The OverFlow Function Failed: Test5.    PC:"
+		BufferOverFlowError1 : string "The OverFlow Function Failed: Test 1.   PC:"
+		BufferOverFlowError2 : string "The OverFlow Function Failed: Test 2.   PC:"
+		BufferOverFlowError3 : string "The OverFlow Function Failed: Test 3.   PC:"
+		BufferOverFlowError4 : string "The OverFlow Function Failed: Test 4.   PC:"
+		BufferOverFlowError5 : string "The OverFlow Function Failed: Test 5.   PC:"
+		MemCompareError1 : string "The MEMCompare Function Failed Test 1.  PC:"
+		MemCompareError2 : string "The MEMCompare Function Failed Test 2.  PC:"
+		MemCompareError3 : string "The MEMCompare Function Failed Test 3.  PC:"
+		MemCompareError4 : string "The MEMCompare Function Failed Test 4.  PC:"
+		MemCompareError5 : string "The MEMCompare Function Failed Test 5.  PC:"
+		ErrorAwareCallError1 : string "The ErrorAwareCall Function Failed Test 1:"
+
 		AllTestsPassed : string "All Tests Passed, Nice!"
 
 
 
-	ErrorMessageTable: var #256
+		ErrorMessageTable: var #256
 
-		static ErrorMessageTable + #0, #TestError
-		static ErrorMessageTable + #10, #BufferOverFlowError1
-		static ErrorMessageTable + #11, #BufferOverFlowError2
-		static ErrorMessageTable + #12, #BufferOverFlowError3
-		static ErrorMessageTable + #13, #BufferOverFlowError4
-		static ErrorMessageTable + #14, #BufferOverFlowError5
-		static ErrorMessageTable + #100, #AllTestsPassed
+			static ErrorMessageTable + #0, #TestError
+			static ErrorMessageTable + #10, #BufferOverFlowError1
+			static ErrorMessageTable + #11, #BufferOverFlowError2
+			static ErrorMessageTable + #12, #BufferOverFlowError3
+			static ErrorMessageTable + #13, #BufferOverFlowError4
+			static ErrorMessageTable + #14, #BufferOverFlowError5
+			static ErrorMessageTable + #15, #MemCompareError1
+			static ErrorMessageTable + #16, #MemCompareError2
+			static ErrorMessageTable + #17, #MemCompareError3
+			static ErrorMessageTable + #18, #MemCompareError4
+			static ErrorMessageTable + #19, #MemCompareError5
+			static ErrorMessageTable + #100, #AllTestsPassed
 
 
 ; DO NOT COPY TO YOUR CODE, ALSO REMOVE THE JUMP MAIN ON THE TOP
 ; Library Tests
 ;
 ;
+	;DO NOT COPy
 	;DO NOT COPY
 	; Inverted Functions, Will Trow Errors if passed, Pass If Failed. 
 		CheckOverFlowReversed: ; <ERRORID, Size, Buffer*, BufferSize, BufferPointer >  Used By the Memory Handler
@@ -261,7 +416,7 @@ jmp main
 				
 			CheckOverFlowReversed_END:
 
-			Call CallError
+			Call CallFatalError
 
 			pop r4
 			pop r3
@@ -302,10 +457,12 @@ jmp main
 		TestBufferPointer: var #1   ; this point to the furthest WRITTEN data along the list. 
 			static TestBufferPointer + #0, #TestBuffer
 
+
+		
 		;DO NOT COPY
 	main:
 	call CleanScreen
-	; setup BufferOverFlow
+	; BufferOverFlow TESTS:
 
 			loadn r0, #1900
 			load r1, TestBufferPointer
@@ -355,9 +512,110 @@ jmp main
 			add r4, r4, r5  ; Buffer Pointer Is now Buffer + 2200
 			call CheckOverFlowReversed    ; expected error so we use reverse, to allow tests to continue
 
-			; All Tests Passed
-				loadn r0, #100
-				call CallError
+	; MEMCompare Tests:
+		; setup
+			TestMem1 : var #5
+				static TestMem1 + #0 , #5
+				static TestMem1 + #1 , #7
+				static TestMem1 + #2 , #3
+				static TestMem1 + #3 , #2
+				static TestMem1 + #4 , #1
+				TestMem1Over : var #1
+				static TestMem1Over + #0 , #7
+
+			TestMem2 : var #5       ; different from Mem1 only in overflow
+				static TestMem2 + #0 , #5  
+				static TestMem2 + #1 , #7
+				static TestMem2 + #2 , #3
+				static TestMem2 + #3 , #2
+				static TestMem2 + #4 , #1
+				TestMem2Over : var #1
+				static TestMem2Over + #0 , #9
+
+			TestMem3 : var #5		; Different from Mem1 Only in last valid addrs
+				static TestMem3 + #0 , #5
+				static TestMem3 + #1 , #7
+				static TestMem3 + #2 , #3
+				static TestMem3 + #3 , #2
+				static TestMem3 + #4 , #6
+				TestMem3Over : var #1
+				static TestMem3Over + #0 , #7
+
+			TestMem4 : var #5		; Different from Mem1 Only in start
+				static TestMem4 + #0 , #2
+				static TestMem4 + #1 , #7
+				static TestMem4 + #2 , #3
+				static TestMem4 + #3 , #2
+				static TestMem4 + #4 , #1
+				TestMem4Over : var #1
+				static TestMem4Over + #0 , #7
+
+			TestMem5 : var #5    	; Different drom Mem1 only in the middle
+				static TestMem5 + #0 , #5
+				static TestMem5 + #1 , #7
+				static TestMem5 + #2 , #2
+				static TestMem5 + #3 , #2
+				static TestMem5 + #4 , #1
+				TestMem5Over : var #1
+				static TestMem5Over + #0 , #7
+
+		; Test 1
+			loadn r0, #TestMem1
+			loadn r1, #TestMem1
+			loadn r2, #5   ; Size
+			call MemCompare
+			; r0 is now 0, 1
+			mov r1, r0
+			loadn r0, #15   ; should give 1 (equal)
+			call CheckIfOne
+		
+		; Test 2
+			loadn r0, #TestMem1
+			loadn r1, #TestMem2
+			loadn r2, #5   ; Size
+			call MemCompare
+			; r0 is now 0, 1
+			mov r1, r0
+			loadn r0, #16   ; should give 1 (equal)
+			call CheckIfOne
+		
+		; Test 3
+			loadn r0, #TestMem1
+			loadn r1, #TestMem3
+			loadn r2, #5   ; Size
+			call MemCompare
+			; r0 is now 0, 1
+			mov r1, r0
+			loadn r0, #17   ; should give 0 (diff)
+			call CheckIfZero
+
+		; Test 4
+			loadn r0, #TestMem1
+			loadn r1, #TestMem4
+			loadn r2, #5   ; Size
+			call MemCompare
+			; r0 is now 0, 1
+			mov r1, r0
+			loadn r0, #18   ; should give 0 (diff)
+			call CheckIfZero
+		
+		; Test 5
+			loadn r0, #TestMem1
+			loadn r1, #TestMem5
+			loadn r2, #5   ; Size
+			call MemCompare
+			; r0 is now 0, 1
+			mov r1, r0
+			loadn r0, #19   ; should give 0 (diff)
+			call CheckIfZero
+
+
+
+	; StackTraceTests
+	
+	; All Tests Passed
+		loadn r0, #100
+			call CallFatalError
 
 
 
