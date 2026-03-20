@@ -3,11 +3,11 @@ push r0    ; stop stack overflow
 jmp main
 
 
-;--------- ErrorSystem     Version 0.1.5
+;--------- ErrorSystem     Version 0.2.0
 ;
 ;	Minimalist Suit To Allow For Easier Error Catching: 
 ; 	Is required in all my libraries to allow you to know imediatly 
-;	if the error is related to my shitty code or your code
+;	if the error is related to my shitty code or your incredible code
 ;
 ;	Error Mesages and ErrorMessageTables can be moved at will, but they must exist somewhere
 ;	
@@ -112,30 +112,33 @@ jmp main
 
 		TraceStack:    ; Only gets called on Fatal Error
 
-			pop r5
+			pop r6
 			loadn r3, #65535
-			loadn r4, #100
+			loadn r5, #65534
 
 			TraceStack_loop:
 
 
-				; if r2 = 65535, exit loop with next word of memory in the stack
+				; if r2 = 65535, add word to to TraceBuffer
 
 					pop r2
 					cmp r2, r3
-					jeq TraceStack_getstack
+					jne TraceStack_skipadd
+
+						;pop r2    ; addres after the sentinel. Its actualy the callers r1
+						pop r2    ; Actual return adrres
+						call TraceBufferAdd  ; adds r2 to list
+
+						TraceStack_skipadd:
+
 
 				; if r2 = 65534, exit beacuse we reached the end of the stack
-					dec r3
-					cmp r2, r3
+					cmp r2, r5
 					jeq TraceStack_exit
 
 				jmp TraceStack_loop
-				TraceStack_getstack:
-			pop r1    ; if found, update address
-						  ; Else Exit
 			TraceStack_exit:
-			push r5
+			push r6
 			rts
 
 
@@ -158,12 +161,15 @@ jmp main
 
 			call TraceStack
 
-			call PrintHexNumberOnScreen
+			call TraceBufferPrint
 			; Print PC after the message
 
 			halt
 
 		PrintHexNumberOnScreen: ; <Index, Number>, < >   ; Prints On Screen
+
+			push r2
+			push r3
 
 			; r0 is the Index to print the number
 			loadn r3, #"x"
@@ -196,6 +202,9 @@ jmp main
 			call DigitHexFinder
 			outchar r3, r0
 			inc r0
+
+			pop r3
+			pop r2
 
 			rts
 
@@ -327,20 +336,98 @@ jmp main
 				pop r1
 				call CallFatalError
 		;Untested
-		ErrorAwareCall: ;  < ErrorID, r7 = Which Function to Call (Pointer) > Clobers r1, make sure to save it before calling it. 
+		ErrorAwareCall: ;  < ErrorID, r7 = Which Function to Call (Pointer) > Clobers r1!!! SAVE IT before calling
 
-			push r1
 			loadn r1, #65535   ; marker for call, to guarantee to find the original functions addres
 			push r1
 
 			call CallI   ; will call whatver is in r7
 
 			pop r1
-			pop r1
 			rts
 
+;----------- StackTracer
+;
+;	For a stack trace that does not have unexpected behaviour we can do either a ring buffer or a just exit when the buffer gets filled
+;
+;	Lets Exit When Buffer Gets Filled, mostlikely, we will want calls that happenned later
+;
+
+	TraceBuffer: var #10   ; Can store up to 10 Traces
+		TraceBufferSize: var #1
+			static TraceBufferSize + #0, #10
+		TraceBufferPointer: var #1
+			static TraceBufferPointer + #0, #TraceBuffer
 
 
+		TraceBufferAdd:  ; < r2 = Data>, <Signal: 1 if full, 0 otherwise>
+			
+			push r0
+			push r1
+			push r2
+
+			mov r0, r2
+
+			; check if buffer is full
+
+			loadn r1, #TraceBuffer
+			load r2, TraceBufferSize
+			add r1, r1, r2
+
+
+			load r2, TraceBufferPointer
+
+			cmp r1, r2
+			jne TraceBufferAdd_Continue
+
+				; code executed if buffer out of space
+				
+				loadn r0, #1
+
+				pop r2
+				pop r1
+				pop r0
+				rts
+
+				TraceBufferAdd_Continue:
+
+			storei r2, r0 ; store Data in location pointed by TraceBufferPointer
+			loadn r0, #0
+
+			inc r2
+			store TraceBufferPointer, r2 
+
+			pop r2
+			pop r1
+			pop r0
+			rts
+
+			
+
+
+		TraceBufferPrint: ; < r0 = index>
+
+			loadn r2, #TraceBuffer
+			load r3, TraceBufferPointer
+			loadn r4, #35 ; the PrintHex Alredy increments 5
+
+
+			TraceBufferPrint_loop:
+
+				cmp r2, r3 ; compare with end of buffer
+				jeg TraceBufferPrint_exit
+
+				loadi r1, r2
+				add r0, r0, r4
+
+				call PrintHexNumberOnScreen
+
+				inc r2
+
+				jmp TraceBufferPrint_loop
+				TraceBufferPrint_exit:
+
+			rts
 
 
 
@@ -362,9 +449,7 @@ jmp main
 		MemCompareError3 : string "The MEMCompare Function Failed Test 3.  PC:"
 		MemCompareError4 : string "The MEMCompare Function Failed Test 4.  PC:"
 		MemCompareError5 : string "The MEMCompare Function Failed Test 5.  PC:"
-		ErrorAwareCallError1 : string "The ErrorAwareCall Function Failed Test 1:"
-
-		AllTestsPassed : string "All Tests Passed, Nice!"
+		ErrorAwareCallError1 : string "All Previous Tests Passed! This Tests Can only run once, make sure to check the stack trace to make sure it works, the rest is OK!:"
 
 
 
@@ -381,7 +466,8 @@ jmp main
 			static ErrorMessageTable + #17, #MemCompareError3
 			static ErrorMessageTable + #18, #MemCompareError4
 			static ErrorMessageTable + #19, #MemCompareError5
-			static ErrorMessageTable + #100, #AllTestsPassed
+			static ErrorMessageTable + #20, #ErrorAwareCallError1
+
 
 
 ; DO NOT COPY TO YOUR CODE, ALSO REMOVE THE JUMP MAIN ON THE TOP
@@ -613,10 +699,94 @@ jmp main
 
 
 	; StackTraceTests
-	
-	; All Tests Passed
-		loadn r0, #100
-			call CallFatalError
+
+		; SetUp
+		jmp skipTraceSetUp
+			TestFunction1:
+
+				rts
+
+			TestFunction2: 
+
+				call TestFunction1
+
+				rts
+
+			TestFunction3:
+
+				loadn r7, #TestFunction4
+				call ErrorAwareCall
+
+				rts
+
+			TestFunction4:
+			
+				loadn r7, #TestFunction5
+				call ErrorAwareCall
+
+				rts
+
+			TestFunction5:
+			
+				call CallFatalError
+
+				rts
+
+
+
+			TestBigFunction1:;  <ErrorID>
+
+				loadn r7, #TestFunction1
+				call ErrorAwareCall
+				call TestFunction2
+				call TestFunction2
+				call TestFunction1
+				loadn r7, #TestFunction2   ; Puts one Error AwareCall, Returns and removes the sentinel
+				call ErrorAwareCall
+				call TestFunction1
+
+				rts
+
+			TestBigFunction2:;  <ErrorID>
+
+				loadn r7, #TestFunction1
+				call ErrorAwareCall   
+				call TestFunction2
+				call TestFunction2
+				call TestFunction1
+				loadn r7, #TestFunction2
+				call ErrorAwareCall
+				call TestFunction1
+				call TestFunction3
+
+				rts
+
+			skipTraceSetUp:
+
+		; test 1
+			loadn r0, #20
+			loadn r1, #10
+			loadn r2, #34
+
+			push r1
+			push r2
+			push r1
+			push r2
+
+			push r1  ; needed because TestBigFunction Clobers r1
+			loadn r7, #TestBigFunction1  
+			call ErrorAwareCall
+			pop r1
+
+			push r1
+			push r2
+			push r2
+			push r1
+
+			push r1
+			loadn r7, #TestBigFunction2   ; will trow an error, 
+			call ErrorAwareCall
+			pop r1
 
 
 
