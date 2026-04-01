@@ -4,6 +4,8 @@ From fine dust we assemble
 Repo for libraries im developing targeting the ICMC Processor:
 https://github.com/simoesusp/Processador-ICMC/tree/master
 
+Already Available and working
+
 1 - Strings
   Simple FString Implementation, Easily Extendable. Please someone edits the assembler to make their declaration easier.
 

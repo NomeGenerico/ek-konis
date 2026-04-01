@@ -1,5 +1,5 @@
 jmp main
-; ---------- Basic String Library
+; ---------- Basic String Library ------- V0.1
 ;
 ;   Basic Implemenntaion Of a FString. Curently supports Decimal numbers and Hex Numbers.
 ;
