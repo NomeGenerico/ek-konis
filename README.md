@@ -1,39 +1,74 @@
 # ek-konis
-From fine dust we assemble
+> *From fine dust we assemble*
 
-Repo for libraries im developing targeting the ICMC Processor:
-https://github.com/simoesusp/Processador-ICMC/tree/master
+Repo for libraries in development targeting the **ICMC Processor**:
+[Processador-ICMC](https://github.com/simoesusp/Processador-ICMC/tree/master)
 
-Already Available and working
+---
 
-1 - Strings
+## Linker
 
-  Simple FString Implementation, Easily Extendable. Please someone edits the assembler to make their declaration easier.
+**Usage:**
 
-2 - ErrorHandling
+In your `.asm` file:
+```asm
+;#Include String.asm
+```
 
-  Easy way to trow fatal errors. Customize error messages and IDs. Prints Last Called Function (Unless you clober the stack you degenerate)
+In terminal:
+```bash
+python linker.py input.asm output.asm
+```
 
-In Active Development: 
+---
 
-3 - RLECompression
+## Libraries
 
-  Compact any data you want, depending on structure could achieve as much as 88% saved. If anyone wants to implement bit packing, feel free.
+### Available & Working
 
-4 - Memory Handler
+#### 0 — Control
+Provides a indirect call instruction
 
-  Easily Declare Objects In memeory, Basicaly free and malloc. Little guardrails, but pretty usefull
+#### 1 — Strings
+Simple `FString` implementation, easily extendable.
+> TODO: edit the assembler to make string declarations easier.
 
-5 - DirtyRectangleRendering 
+#### 2 — ErrorHandling
+Easy way to throw fatal errors. Customize error messages and IDs. Prints last called function *(unless you clobber the stack, you degenerate)*.
 
-  Everyone Knows Programers are lazy. Unfortunatly sometimes we are too lazy and ofload our work into the hardware. Not anymore, Easily rerender only what has changed. Supoorts for 3 Layers, Default         colors for layers, Custom collors per screen index, Etc. this way we can be lazier, faster!
+---
 
-6 - UiSystem
-    
-  Create Interactable Menus, with a simple selection and confirm actions, and selection highlingting. easily extendable. Give a RLE comprresed
-    string of the Apearence, Define slectable regions, Write a function for each selectable Region, and it just works. Also stack as many elements as you want (as long as you want less than 20 (Can be     Changed!))
+### In Active Development
 
-7 - ObjectSystem 
+#### 3 — RLECompression
+Compact any data you want — depending on structure, could achieve up to **88% space saved**.
+> Feel free to implement bit packing if you're up for it.
 
-  Everything you need: Create Objects (You will write the constructor tough :[ ), Dispatch Behaviour Functions Easily, Store Custum Data Per Object that can be useed by its functions
+#### 4 — Memory Handler
+Easily declare objects in memory — basically `free` and `malloc`. Few guardrails, but pretty useful.
 
+#### 5 — DirtyRectangleRendering
+Everyone knows programmers are lazy. Now your code can be lazy too. Easily re-render only what has changed. Doing the absolute minimum since 2026
+
+Features:
+- Supports different layers with z ordering
+- Default colors per layer
+- Custom colors per screen index
+- Be lazier, *faster*
+
+#### 6 — UiSystem
+Create interactable menus with simple selection, confirm actions, and selection highlighting. Easily extendable.
+
+How it works:
+1. Provide an **RLE-compressed string** of the appearance
+2. Define selectable regions
+3. Write a function for each selectable region
+4. It just works™
+
+Stack as many elements as you want *(default limit: 20 — configurable)*.
+
+#### 7 — ObjectSystem
+Everything you need:
+- Create objects *(you'll still write the constructor yourself 😔)*
+- Dispatch behaviour functions easily
+- Store custom data per object, accessible by its functions via a Object ID
