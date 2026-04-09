@@ -33,11 +33,12 @@ jmp main
     ;ResolveStringSpecialChar Data
         StringSpecialCharNum: var #1  ; this is important to stop many bugs. 
             ; CSpecial Chars Start at 256 and go up sequencialy. Just define a function to handle them. 
-            static StringSpecialCharNum + #0 , #2
+            static StringSpecialCharNum + #0 , #3
 
-        StringSpecialCharHandlers: var #2
+        StringSpecialCharHandlers: var #3
             static StringSpecialCharHandlers + #0 , #ResolveString_Hex
             static StringSpecialCharHandlers + #1 , #ResolveString_Dec
+            static StringSpecialCharHandlers + #2 , #ResolveString_Str
 
     ResolveStringSpecialChar:  ; assumes r5 = 255
 
@@ -74,6 +75,8 @@ jmp main
 
         call PrintHexNumberOnScreen
 
+        dec r0 ; fix the off by one in the str printing
+
         pop r1
         rts 
 
@@ -85,6 +88,27 @@ jmp main
 
         call PrintDecNumOnScreen
 
+        dec r0 ; fix the off by one in the str printing
+
+        pop r1
+        rts 
+    ResolveString_Str:
+        inc r1
+        push r1
+        push r2
+
+
+        inc r1
+        loadi r2, r1
+        dec r1
+
+        loadi r1, r1 ; gets value in string
+
+        call PrintFStr
+
+        dec r0 ; fix the off by one in the str printing
+
+        pop r2
         pop r1
         rts 
 
@@ -280,13 +304,40 @@ main:
             static TestStr2 + #22, #257  ; DEC Marker
             static TestStr2 + #23, #TestDec1  ; Hex num addr
         ; Test
-        loadn r0, #80
+        loadn r0, #120
         loadn r1, #TestStr2
         loadn r2, #0
 
         call PrintFStr
 
+        ; Test 3
+        ; DATA
+        TestInnerString1 : string "Inner_String"
+        TestStr3 : string "Isso e uma string: 000 Texto Depois do Numero"
+            static TestStr3 + #19, #258  ; DEC Marker
+            static TestStr3 + #20, #TestInnerString1  ; Hex num addr
+            static TestStr3 + #21, #64512   ; color blue
+        ; Test
+        loadn r0, #240
+        loadn r1, #TestStr3
+        loadn r2, #0
 
+        call PrintFStr
+
+
+        ; Test 4
+        ; DATA
+        ;TestInnerString1 : string "Inner_String"
+        TestStr4 : string "Isso e uma string Recursiva: 000 Texto Depois do Numero"
+            static TestStr4 + #28, #258  ; Str Marker
+            static TestStr4 + #29, #TestStr4  ; Str addr
+            static TestStr4 + #30, #0
+        ; Test
+        loadn r0, #360
+        loadn r1, #TestStr4
+        loadn r2, #0
+
+        call PrintFStr
 
     halt
 
