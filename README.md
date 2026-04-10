@@ -36,13 +36,13 @@ Simple `FString` implementation, easily extendable.
 #### 2 — ErrorHandling
 Easy way to throw fatal errors. Customize error messages and IDs. Prints last called function *(unless you clobber the stack, you degenerate)*.
 
----
-
-### In Active Development
-
 #### 3 — RLECompression
 Compact any data you want — depending on structure, could achieve up to **88% space saved**.
 > Feel free to implement bit packing if you're up for it.
+
+---
+
+### In Active Development
 
 #### 4 — Memory Handler
 Easily declare objects in memory — basically `free` and `malloc`. Few guardrails, but pretty useful.
