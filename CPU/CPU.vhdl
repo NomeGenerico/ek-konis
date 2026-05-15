@@ -462,14 +462,18 @@ begin
 				
 				M3 := Reg(RY);
 				M4 := Reg(RZ);
-				X <= M3;
+				
+				x <= M3;
 				y <= M4;
-				OP(5 DOWNTo 0) <= IR(15 Downto 10);
+				
+				OP(5 DOWNTO 0) <= IR(15 DOWNTO 10);
 				OP(6) <= IR(0);
 				selM2 := sULA;
-				LoadReg(RX) := '1';
-				selM6 := sULA;
-				LoadFr := '1';
+				
+				loadReg(RX) := '1';
+				SelM6 := sULA;
+				loadFR := '1';
+				
             state := fetch;
          END IF;
 
@@ -482,34 +486,51 @@ begin
 
 
          IF(IR(15 DOWNTO 14) = ARITH AND (IR(13 DOWNTO 10) = INC))   THEN
-				M4 := Reg(RX);
-				M3 := "0000000000000001";
-            X <= M3;
-            Y <= M4;
-				OP(5 DOWNTO 0) <= IR(15 DOWNTO 10);
-				OP(6) <= IR(0);
-				OP(3 DOWNTO 0) <= ADD;
-            selM2 := sULA;
-				LoadReg(RX) := '1';
+
+            M3 := Reg(RX);
+				M4 := "0000000000000001";
+				
+				x <= M3;
+				y <= M4;
+				
+				OP(6) <= '0';	
+				OP(5 DOWNTO 4) <= ARITH ;
+				
+				if (IR(6) = '0' ) THEN 
+					OP(3 DOWNTO 0) <= ADD;
+				else 
+					OP(3 DOWNTO 0) <= SUB;
+				end if;
+			
+				selM2 := sULA;
+				loadReg(RX) := '1';
+				SelM6 := sULA;
+				loadFR := '1';
+				
             state := fetch;
+				
          END IF;
 
-			IF(IR(15 DOWNTO 14) = ARITH AND (IR(13 DOWNTO 10) = DEC))   THEN
-				M4 := Reg(RX);
-				M3 := "0000000000000001";
-				OP(5 DOWNTO 0) <= IR(15 DOWNTO 10);
-				OP(6) <= IR(0);
-				OP(3 DOWNTO 0) <= Sub;
-				selM2 := sULA;
-				LoadReg(RX) := '1';
-            state := fetch;
-			 END IF;
 
 --========================================================================
 -- LOGIC OPERATION ('SHIFT', and 'CMP'  NOT INCLUDED)           RX <- RY (?) RZ
 --========================================================================
          IF(IR(15 DOWNTO 14) = LOGIC AND IR(13 DOWNTO 10) /= SHIFT AND IR(13 DOWNTO 10) /= CMP) THEN
-
+		
+				M3 := Reg(RY);
+				M4 := Reg(RZ);
+				
+				x <= M3;
+				y <= M4;
+				
+				OP(5 DOWNTO 0) <= IR(15 DOWNTO 10);
+				OP(6) <= IR(0);
+				selM2 := sULA;
+				
+				loadReg(RX) := '1';
+				SelM6 := sULA;
+				loadFR := '1';
+				
             state := fetch;
          END IF;
 
@@ -764,7 +785,8 @@ BEGIN
 
    IF (reset = '1') THEN
       auxFR <= x"0000";
-      RESULT <= x"0000";
+      
+		RESULT <= x"0000";
    else
       auxFR <= FR;
 
