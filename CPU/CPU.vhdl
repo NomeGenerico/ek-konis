@@ -125,6 +125,7 @@ process(clk, reset)
    variable PC      : STD_LOGIC_VECTOR(15 downto 0);      -- Program Counter
    variable IR      : STD_LOGIC_VECTOR(15 downto 0);      -- Instruction Register
    variable SP      : STD_LOGIC_VECTOR(15 downto 0);      -- Stack Pointer
+	variable SP1     : STD_LOGIC_VECTOR(15 downto 0);		-- Stack Pointer + 1
    variable MAR   : STD_LOGIC_VECTOR(15 downto 0);      -- Memory address Register
    VARIABLE   TECLADO   :STD_LOGIC_VECTOR(15 downto 0);      -- Registrador para receber dados do teclado -- nao tinha
 
@@ -261,6 +262,9 @@ begin
       if (selM5 = sRegs)        THEN M5 <= M3;
 		ELSIF (selM5 = sPC)       THEN M5 <= PC;
       END IF;
+		
+		-- SP + 1
+		SP := SP + '1';
 
       -- Carrega dados do Mux 2 para os registradores
       if(LoadReg(RX) = '1') then reg(RX) := M2; end if;
@@ -561,7 +565,19 @@ begin
 -- CMP      RX, RY
 --========================================================================
          IF(IR(15 DOWNTO 14) = LOGIC AND IR(13 DOWNTO 10) = CMP) THEN
-
+						
+				M3 := Reg(RX);
+				M4 := Reg(RY);
+				
+				x <= M3;
+				y <= M4;
+				
+				OP(5 DOWNTO 0) <= IR(15 DOWNTO 10);
+				OP(6) <= '0';
+				
+				SelM6 := sULA;
+				loadFR := '1';
+				
             state := fetch;
          END IF;
 
@@ -603,14 +619,46 @@ begin
 -- JMP Condition: (UNconditional, EQual, Not Equal, Zero, Not Zero, CarRY, Not CarRY, GReater, LEsser, Equal or Greater, Equal or Lesser, OVerflow, Not OVerflow, Negative, DIVbyZero, NOT USED)
 --========================================================================
          IF(IR(15 DOWNTO 10) = CALL) THEN
-
-         END IF;
+			
+            IF((IR(9 DOWNTO 6) = "0000") OR
+            ((IR(9 DOWNTO 6) = "0111") AND FR(0) = '1') OR
+            ((IR(9 DOWNTO 6) = "1001") AND (FR(2) = '1' OR FR(0) = '1')) OR
+            ((IR(9 DOWNTO 6) = "1000") AND FR(1) = '1') OR
+            ((IR(9 DOWNTO 6) = "1010") AND (FR(2) = '1' OR FR(1) = '1')) OR
+            ((IR(9 DOWNTO 6) = "0001") AND FR(2) = '1') OR
+            ((IR(9 DOWNTO 6) = "0010") AND FR(2) = '0') OR
+            ((IR(9 DOWNTO 6) = "0011") AND FR(3) = '1') OR
+            ((IR(9 DOWNTO 6) = "0100") AND FR(3) = '0') OR
+            ((IR(9 DOWNTO 6) = "0101") AND FR(4) = '1') OR
+            ((IR(9 DOWNTO 6) = "0110") AND FR(4) = '0') OR
+            ((IR(9 DOWNTO 6) = "1011") AND FR(5) = '1') OR
+            ((IR(9 DOWNTO 6) = "1100") AND FR(5) = '0') OR
+            ((IR(9 DOWNTO 6) = "1101") AND FR(6) = '1') OR
+            ((IR(9 DOWNTO 6) = "1110") AND FR(9) = '1')) THEN
+					M5 <= PC;
+					M1 <= SP;
+					RW <= '1';
+					state := exec;
+					DecSP := '1';
+				ELSE
+					IncPc := '1';
+					state := fetch;
+				END IF;
+			
+			END IF;
 
 --========================================================================
 -- RTS          PC <- Mem[SP]
 --========================================================================
          IF(IR(15 DOWNTO 10) = RTS) THEN
-
+			
+				
+				IncSP := '1';
+				M1 <= SP1;
+				RW <= '0';
+				LoadPC := '1';
+				
+				
             state := exec;
          END IF;
 
@@ -714,6 +762,10 @@ begin
 --========================================================================
          IF(IR(15 DOWNTO 10) = CALL) THEN
 
+				M1 <= PC;
+				RW <= '0';
+				LoadPc := '1';
+				
             state := fetch;
          END IF;
 
@@ -722,7 +774,9 @@ begin
 --========================================================================
          IF(IR(15 DOWNTO 10) = RTS) THEN
 
-            state := exec2;
+				IncPc := '1';
+				
+            state := fetch;
          END IF;
 
 --========================================================================
