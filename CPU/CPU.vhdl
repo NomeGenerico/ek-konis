@@ -123,6 +123,7 @@ process(clk, reset)
 
    --Register Declaration:
    variable PC      : STD_LOGIC_VECTOR(15 downto 0);      -- Program Counter
+	variable MEM1     : STD_LOGIC_VECTOR(15 downto 0);			-- MEM + 1
    variable IR      : STD_LOGIC_VECTOR(15 downto 0);      -- Instruction Register
    variable SP      : STD_LOGIC_VECTOR(15 downto 0);      -- Stack Pointer
 	variable SP1     : STD_LOGIC_VECTOR(15 downto 0);		-- Stack Pointer + 1
@@ -135,6 +136,7 @@ process(clk, reset)
    VARIABLE   M2            :STD_LOGIC_VECTOR(15 downto 0);   -- Mux dos barramentos de dados internos para os Registradores
    VARIABLE M3, M4      :STD_LOGIC_VECTOR(15 downto 0);   -- Mux dos Registradores para as entradas da ULA
    VARIABLE   M6            :STD_LOGIC_VECTOR(15 downto 0);   -- Mux do Flag Register
+	VARIABLE   M7			 :STD_LOGIC_VECTOR(15 downto 0);   -- Mux do barramento de memoria.
 
    -- Novos Sinais da Versao 2: Controle dos registradores internos (Load-Inc-Dec)
    variable LoadReg      : LoadRegisters;
@@ -232,6 +234,8 @@ begin
       if(IncSP = '1')   then SP := SP + x"0001";    end if;
 
       if(DecSP = '1')   then SP := SP - x"0001";    end if;
+		
+		
 
       -- Selecao do Mux6
       if (selM6 = sULA) THEN M6 := auxFR;            -- Sempre recebe flags da ULA
@@ -264,7 +268,10 @@ begin
       END IF;
 		
 		-- SP + 1
-		SP := SP + '1';
+		SP1 := SP + '1';
+		
+		-- MEM + 1;
+		MEM1 := MEM + '1';
 
       -- Carrega dados do Mux 2 para os registradores
       if(LoadReg(RX) = '1') then reg(RX) := M2; end if;
@@ -657,16 +664,26 @@ begin
 				M1 <= SP1;
 				RW <= '0';
 				LoadPC := '1';
+				PC := MEM1;
 				
 				
-            state := exec;
+            state := fetch;
          END IF;
 
 --========================================================================
 -- PUSH RX
 --========================================================================
          IF(IR(15 DOWNTO 10) = PUSH) THEN
-
+			
+				M1 <= SP;
+				RW <= '1';
+				IF(IR(6) = '0') THEN
+					M3 := REG(RX);
+				ELSE
+					M3 := FR;
+				END IF;
+				M5 <= M3;
+				DecSP := '1';
             state := fetch;
          END IF;
 
@@ -674,8 +691,18 @@ begin
 -- POP RX
 --========================================================================
          IF(IR(15 DOWNTO 10) = POP) THEN
-
-            state := exec;
+			
+				M1 <= SP1;
+				incSP := '1';
+				RW <= '0';
+				IF(IR(6) = '0') THEN
+					selM2 := sMEM;
+					LoadReg(RX) := '1';
+				ELSE
+					SelM6 := sMEM;
+					LoadFR := '1';
+				END IF;
+            state := fetch;
          END IF;
 
 --========================================================================
@@ -769,6 +796,7 @@ begin
             state := fetch;
          END IF;
 
+--UNUSED
 --========================================================================
 -- EXEC RTS          PC <- Mem[SP]
 --========================================================================
@@ -779,6 +807,8 @@ begin
             state := fetch;
          END IF;
 
+			
+--UNUSED
 --========================================================================
 -- EXEC POP RX/FR
 --========================================================================
@@ -789,12 +819,16 @@ begin
 
 -- XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
 
+
+--UNUSED
 --************************************************************************
 -- EXECUTE2 STATE
 --************************************************************************
 
          when exec2 =>
             PONTO <= "100";
+
+--UNUSED
 --========================================================================
 -- EXEC2 RTS          PC <- Mem[SP]
 --========================================================================
