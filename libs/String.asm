@@ -167,6 +167,11 @@ jmp main
         push r4
         push r5
 
+        PrintDecNumOnScreen_ZeroCheck:
+            loadn r3, #0
+            cmp r1, r3
+            jeq PrintDecNumOnScreen_PrintZero
+
         loadn r2, #PrintDecNumOnScreen_Buffer
         loadn r3, #4
         add r2, r2, r3
@@ -193,6 +198,14 @@ jmp main
             outchar r3, r0
             inc r0
             jmp PrintDecNumOnScreen_WalkBuffer
+            
+        ; print zero if the number is zero
+
+        PrintDecNumOnScreen_PrintZero:
+            loadn r3, #"0"
+            outchar r3, r0
+            inc r0
+
         PrintDecNumOnScreen_Exit:
         pop r5
         pop r4
@@ -202,7 +215,6 @@ jmp main
         rts
 
     PrintStr:  ; <Printing Pos, Str*, color>, < > 
-        push r0  ; printing position
         push r1	 ; String Address ; its now a pointer
         push r2	 ; color
         push r3
@@ -227,7 +239,6 @@ jmp main
         pop r3
         pop r2
         pop r1
-        pop r0
         rts
 
     PrintFStr: ; <Printing Pos, Str*, color>, < Last Printed Pos> a little slower than normal printing

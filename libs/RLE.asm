@@ -131,8 +131,7 @@ jmp Tests
 
 		rts
 
-	; Untested and likely to be very wrong
-	RLETraverser: ; <Target Index, RLEstring*, Buffer*> , <r3 = Value>But you should also exit when target == r3 (exact start of next fragment is a cache hit on the new fragment). With jle being strict <, a target that lands exactly on a fragment boundary (target == r3) will not exit — it will advance one more time and overshoot.
+	RLETraverser: ; <Target Index, RLEstring*, Buffer*> , <r3 = Value>
 
 			push r0
 			push r1
@@ -222,6 +221,7 @@ jmp Tests
 			rts
 
 
+	; Not Implemented Yet
 	RLEPartialDecoder: ; <Target*, Source*, target start index, Length>, < >   ; Could be buffered or not, i'm not sure which is better for now
 
 		; Takes A RLEstring and decodes from a start index. Can be used to decode a part of interest faster. Could be edited in many ways to suit your code better. 
@@ -344,7 +344,7 @@ jmp Tests
 					Skip_Test2Error5:
 
 
-				loadn r0, #100
+				loadn r0, #99  
 				loadn r4, #"F"
 				call RLETraverser
 				store TestReturn, r3
@@ -399,15 +399,15 @@ jmp Tests
 			static TraverseError4 + #40, TestTraverseBuffer + #1
 			static TraverseError4 + #55, #258
 			static TraverseError4 + #56, #TestReturn
-		TraverseError5 : string "Traverse Failed Test 5    Buffer: 00 , 00     Returned: 00"
+		TraverseError5 : string "Traverse Failed Test 5    Buffer: 00 , 00     Returned: 00     String Location: 00"
 			static TraverseError5 + #34, #257
 			static TraverseError5 + #35, #TestTraverseBuffer
 			static TraverseError5 + #39, #257
 			static TraverseError5 + #40, TestTraverseBuffer + #1
-			static TraverseError5 + #56, #258
+			static TraverseError5 + #56, #257
 			static TraverseError5 + #57, #TestReturn
-
-
+			static TraverseError5 + #81, #256
+			static TraverseError5 + #82, #TestData1
 
 		AllTestsPassed : string "All Tests Passed, Nice!"
 

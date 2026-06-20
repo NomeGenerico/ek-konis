@@ -10,14 +10,14 @@ jmp main
 ;
 ;	Minimalist Suit To Allow For Easier Error Catching: 
 ; 	Is required in all my libraries to allow you to know imediatly 
-;	if the error is related to my shitty code or your incredible code
+;	if the error is related to my shitty code or your shity code
 ;
 ;	Error Mesages and ErrorMessageTables can be moved at will, but they must exist somewhere
 ;	
 ;	The Usage Is prety simple, Define Error Mesages and Assing them to IDs. Call "CallFatalError" with the IDs to get a 
 ;	Yellow Screen Of Death (YSOD)
 ;
-; 	Some Other Functions may also provided, They are mainly used for my other libraries but are general error cheking tha you can use. 
+; 	Some Other Functions may also provided, They are mainly used for my other libraries but are general error cheking that you can use. 
 ;
 ;	Please Respect the Private And Public Declarations. You are king, but Private Functions May Use Undeclared Conventions
 ;	That might make Debuging Hell
@@ -27,9 +27,9 @@ jmp main
 ;
 
 
-	; RoadMap For V 0.3.0 
-		; Add a new error calling function that can take arguments and formats strings. 
-		; maybe separate string stuff from the error system into a specific string library. 
+	; RoadMap For V 0.4.0 
+		; - Improve the Stack Trace
+
 
 
 
@@ -143,16 +143,17 @@ jmp main
 
 			halt
 
-		CheckOverFlowSafe: ; <   , Size, Buffer*, BufferSize, BufferPointer >, < r2 = Error or not>  Used By the Memory Handler 
+		CheckOverFlowSafe: ; <   , Size, Buffer* , BufferSize, BufferWritePointer >, < r2 = Error or not>  Used By the Memory Handler 
 
-			push r1
-			push r3
-			push r4
+			push r1  ; Size of alocated object
+			push r2	 ; Buffer*  (Start of buffer)
+			push r3	 ; BufferSize
+			push r4  ; BufferWritePointer
 
 			;r1 = Size of Object
 
-			add r1, r1, r4  ; BufferPointer + Size
-			add r2, r2, r3  ; Buffer + BufferSize
+			add r1, r1, r4  ; BufferWritePointer + Size
+			add r2, r2, r3  ; Buffer* + BufferSize
 
 			cmp r1, r2
 			jel CheckOverFlowSafe_END
@@ -172,25 +173,25 @@ jmp main
 
 			pop r4
 			pop r3
+			pop r2
 			pop r1
 
 
 			rts
 
-		CheckOverFlow:   ; <  ErrorID , Size, Buffer*, BufferSize, BufferPointer > , <   >
+		CheckOverFlow:   ; <  ErrorID , Size, Buffer*, BufferSize, BufferWritePointer > , <   >
 
-			push r1
-			push r2
-			push r3
-			push r4
+			push r1  ; Size of alocated object
+			push r2	 ; Buffer*  (Start of buffer)
+			;	 r3	 ; BufferSize
+			;	 r4  ; BufferWritePointer
 
 			Call CheckOverFlowSafe
 
 			mov r1, r2
 			call CheckIfZero   ; Errors if not zero
 			
-			pop r4
-			pop r3
+
 			pop r2
 			pop r1
 			

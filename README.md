@@ -22,6 +22,14 @@ python linker.py input.asm output.asm
 
 ---
 
+CPU/
+    An optimized version of the ICMC processor developed
+    alongside these libraries. Not part of the official
+    course submission. Some instructions run up to 2 cycles
+    faster than the reference implementation.
+
+---
+
 ## Libraries
 
 ### Available & Working

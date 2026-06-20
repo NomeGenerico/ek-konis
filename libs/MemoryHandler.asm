@@ -1,8 +1,10 @@
+;#Include ErrorHandler.asm
+;#Include String.asm
 
-;--------- Memory
-;
-;
-;
+
+;START OF LIB
+;--------- Memory Utils
+;   Just some helpers
 
 	MemMove: ; <*dest, *source, size>    
 
@@ -58,7 +60,8 @@
 
 
 
-;
+
+
 ;--------- ObjectPool
 ; 
 	ObjectPool: var #2000   ; stores Constructed Objects
@@ -311,10 +314,4 @@
 	
 	;
 
-
-; -------- RingBuffer
-;
-;
-;
-;
 
