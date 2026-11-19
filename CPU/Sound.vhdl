@@ -32,9 +32,6 @@ END SB;
 
 ARCHITECTURE behavior OF SB IS
 
-	-- Estados da Maquina de Controle (fetch/decode/exec2 nao eram usados)
-	TYPE STATES IS (idle, exec);
-
 	-- Define LUT (1 periodo completo de senoide, 256 amostras de 4 bits)
 	type LUT_ARRAY is array (0 to 255) of STD_LOGIC_VECTOR(3 downto 0);
 
@@ -74,9 +71,9 @@ ARCHITECTURE behavior OF SB IS
    	 );
 
 	-- Estado de controle
-		signal state         : STATES := idle;
 		signal IR            : STD_LOGIC_VECTOR(15 DOWNTO 0) := (others => '0');  -- ultima instrucao (debug)
 		signal IS_Instr_prev : STD_LOGIC := '0';                                  -- para detectar borda de IS_Instruction
+		signal last_sb_in    : STD_LOGIC_VECTOR(15 DOWNTO 0) := (others => '0');  -- SB_DataIn do clock anterior
 
 	-- Palavras de sintonia (tuning words) dos 4 canais: f_saida = palavra * 25MHz / 2^28
 	-- O processador envia a frequencia em unidades de 0,1 Hz (10000 = 1 kHz);
@@ -127,8 +124,6 @@ ARCHITECTURE behavior OF SB IS
 		signal ms_tick : STD_LOGIC := '0';
 
 	-- Constantes
-		CONSTANT SOUNDI        : STD_LOGIC_VECTOR (2 DOWNTO 0) := "101";  -- ID da placa em IR(15..13)
-		CONSTANT CHECK_SOUNDI  : BOOLEAN := true;                         -- false = aceita instrucao de qualquer ID
 		CONSTANT MS_DIV        : INTEGER := 25000;                        -- 25 MHz / 25000 = 1 kHz
 
 	-- Instructions (IR(12..10))
@@ -170,10 +165,8 @@ BEGIN
 --#########################
 MaquinaDeControle: process(clk, reset)
 
-	variable Last_Instruction : STD_LOGIC_VECTOR(2 DOWNTO 0) := (others => '0');
-	variable Temp_freq_c4     : UNSIGNED(16 DOWNTO 0)        := (others => '0');
-	variable op               : STD_LOGIC_VECTOR(2 DOWNTO 0);
-	variable id_ok            : BOOLEAN;
+	variable Temp_freq_c4 : UNSIGNED(16 DOWNTO 0) := (others => '0');
+	variable op           : STD_LOGIC_VECTOR(2 DOWNTO 0);
 
 BEGIN
 
@@ -181,11 +174,11 @@ BEGIN
 
 		ISPlaying       <= '0';
 		isImedPlaying   <= '0';
-		state           <= idle;
 		NewNoteDuration <= (others => '0');
 		note_toggle     <= '0';
 		IR              <= (others => '0');
 		IS_Instr_prev   <= '0';
+		last_sb_in      <= (others => '0');
 		end_s1 <= '0';  end_s2 <= '0';  end_s3 <= '0';
 
 		freq_c1 <= (others => '0');
@@ -193,10 +186,13 @@ BEGIN
 		freq_c3 <= (others => '0');
 		freq_c4 <= (others => '0');
 
-		Last_Instruction := "000";
-		Temp_freq_c4     := (others => '0');
+		Temp_freq_c4 := (others => '0');
 
 	elsif rising_edge(clk) then
+
+		-- Guarda o que a CPU colocou no barramento neste clock
+		-- (dentro do processo, last_sb_in ainda tem o valor do clock ANTERIOR)
+		last_sb_in <= SB_DataIn;
 
 		-- Sincroniza o aviso de "nota terminou" vindo do dominio 25MHz
 		end_s1 <= end_toggle;
@@ -211,53 +207,41 @@ BEGIN
 			freq_c4       <= Temp_freq_c4;
 		end if;
 
-		--#########
-		-- "FETCH" (so na borda de subida de IS_Instruction)
-		--#########
+		-- IS_Instruction so sobe em instrucao de som.
+		-- Protocolo: last_sb_in = palavra de instrucao (clock anterior), SB_DataIn = palavra de dados (agora)
 		if (IS_Instruction = '1' and IS_Instr_prev = '0') then
 
-			IR <= SB_DataIn;
-			op := SB_DataIn(12 DOWNTO 10);
+			IR <= last_sb_in;
+			op := last_sb_in(12 DOWNTO 10);
 
-			id_ok := (not CHECK_SOUNDI) or (SB_DataIn(15 DOWNTO 13) = SOUNDI);
-
-			if (id_ok) then
-
+--========================================================================
+-- START_Playback
+--========================================================================
 				if (op = START_Playback) then
 					ISPlaying <= '1';
-					state     <= idle;
 
+--========================================================================
+-- STOP_Playback
+--========================================================================
 				elsif (op = STOP_Playback) then
 					ISPlaying <= '0';
-					state     <= idle;
 
+--========================================================================
+-- Imed_PLAY: duracao (ms) em instr(9..0), frequencia (0,1 Hz) na palavra de dados
+--========================================================================
 				elsif (op = Imed_PLAY) then
-					NewNoteDuration  <= SB_DataIn(9 DOWNTO 0);   -- ate 1023 ms
-					Last_Instruction := op;
-					state            <= exec;
+					NewNoteDuration <= last_sb_in(9 DOWNTO 0);       -- ate 1023 ms
+
+					-- So guarda a frequencia original se nao havia nota imediata tocando
+					if (isImedPlaying = '0') then
+						Temp_freq_c4 := freq_c4;
+					end if;
+
+					freq_c4       <= to_tuning(unsigned(SB_DataIn));
+					ISPlaying     <= '1';
+					isImedPlaying <= '1';
+					note_toggle   <= not note_toggle;                -- avisa o SoundEngine
 				end if;
-
-			end if;
-
-		--###########
-		--   EXEC (ciclo seguinte, com IS_Instruction = '0': SB_DataIn traz a frequencia)
-		--###########
-		elsif (state = exec and IS_Instruction = '0') then
-
-			if (Last_Instruction = Imed_PLAY) then
-
-				-- So guarda a frequencia original se nao havia nota imediata tocando
-				if (isImedPlaying = '0') then
-					Temp_freq_c4 := freq_c4;
-				end if;
-
-				freq_c4       <= to_tuning(unsigned(SB_DataIn));   -- SB_DataIn em unidades de 0,1 Hz
-				ISPlaying     <= '1';
-				isImedPlaying <= '1';
-				note_toggle   <= not note_toggle;   -- avisa o SoundEngine (NewNoteDuration ja esta estavel)
-			end if;
-
-			state <= idle;
 
 		end if;
 
