@@ -29,6 +29,11 @@ entity cpu is
 
       PC_data  : out STD_LOGIC_VECTOR(15 downto 0);
       break    : out STD_LOGIC
+
+      -- Sound Board
+      SB_dataIN :  STD_LOGIC_VECTOR(15 downto 0);
+      SB_dataOUT :  STD_LOGIC_VECTOR(15 downto 0);
+      SB_isInstruction : out bit;
    );
 end cpu;
 
@@ -95,6 +100,14 @@ ARCHITECTURE main of cpu is
    CONSTANT SETC         : STD_LOGIC_VECTOR(5 downto 0) := "001000";   -- CLEARC / SETC  -- Set/Clear CarRY: b9 = 1-set; 0-clear   Format: < inst(6) | b9 | xxxxxxxxx >
    CONSTANT BREAKP      : STD_LOGIC_VECTOR(5 downto 0) := "001110";    -- BREAK POINT    -- Switch to manual clock                  Format: < inst(6) | xxxxxxxxxx >
 
+   -- SOUND INSTRUCTIONS --
+   CONSTANT SOUND : STD_LOGIC_VECTOR = "101"
+   -- Sound Instructions:
+   CONSTANT START_Playback : STD_LOGIC_VECTOR (2 DOWNTO 0) := "000";
+	CONSTANT STOP_Playback  : STD_LOGIC_VECTOR (2 DOWNTO 0) := "001";
+	CONSTANT Imed_PLAY      : STD_LOGIC_VECTOR (2 DOWNTO 0) := "010";
+
+
 
    -- CONSTANTes para controle do Mux2: Estes sinais selecionam as respectivas entradas para o Mux2
    CONSTANT sULA      : STD_LOGIC_VECTOR (2 downto 0) := "000";
@@ -106,8 +119,6 @@ ARCHITECTURE main of cpu is
    -- CONSTANTes para controle do Mux5: Estes sinais selecionam as respectivas entradas para o Mux2
    CONSTANT sRegs    : integer := 0;
    CONSTANT sPC      : integer := 1;
-
-
 
    -- Sinais para o Processo da ULA
    signal OP            : STD_LOGIC_VECTOR(6 downto 0);   -- OP(6) deve ser setado para OPeracoes com carRY
@@ -128,8 +139,7 @@ process(clk, reset)
    variable SP      : STD_LOGIC_VECTOR(15 downto 0);      -- Stack Pointer
 	variable SP1     : STD_LOGIC_VECTOR(15 downto 0);		-- Stack Pointer + 1
    variable MAR   : STD_LOGIC_VECTOR(15 downto 0);      -- Memory address Register
-   VARIABLE TECLADO   :STD_LOGIC_VECTOR(15 downto 0);      -- Registrador para receber dados do teclado -- nao tinha
-	VARIABLE ADDRBASE :STD_LOGIC_VECTOR(8 downto 0);    -- Resgistrador base de memoria 9 higher bits
+   VARIABLE   TECLADO   :STD_LOGIC_VECTOR(15 downto 0);      -- Registrador para receber dados do teclado -- nao tinha
 
    variable reg : Registers;
 
@@ -308,6 +318,9 @@ begin
       -- Novo na Versao 3: para escrever PC no LCD da placa
       PC_data <= PC;
 
+      -- Novo Placa de som:
+      SB_dataOUT <= MEM
+
       case state is
 --************************************************************************
 -- FETCH STATE
@@ -387,18 +400,7 @@ begin
 				IncPc := '1';
             state := exec;  -- Vai para o estado de Executa para buscar o dado do endereco
          END IF;
-			
---========================================================================
--- LOAD   Fast   Format: < inst(6) | RX(3) | 7bit address >
---========================================================================
-         IF(IR(15 DOWNTO 10) = LOAD) THEN -- Busca o endereco
-			
-				M1(6 Downto 0) <= IR(6 Downto 0);
-				M1(15 Downto 7) <= ADDRBASE;
-				selM2 := sMeM;
-				LoadReg(RX) := '1';
-            state := fetch;
-         END IF;
+
 
 
 --========================================================================
@@ -410,19 +412,6 @@ begin
 				LoadMAR := '1';
 				IncPc := '1';
             state := exec;  -- Vai para o estado de Executa para gravar Registrador no endereco
-				
-         END IF;
---========================================================================
--- STORE   Fast   Format: < inst(6) | RX(3) | 7bit address >
---========================================================================	
-	      IF(IR(15 DOWNTO 10) = STORE) THEN  -- Busca o endereco
-
-				M1(6 Downto 0) <= IR(6 Downto 0);
-				M1(15 Downto 7) <= ADDRBASE;
-				RW <= '0';
-				selM2 := sMeM;
-				LoadReg(RX) := '1';
-            state := fetch;
          END IF;
 
 --========================================================================
@@ -459,26 +448,14 @@ begin
 
 
 --========================================================================
--- CHANGE THE COMPILER  !!!!!!! TODO TODO TODO
-
 -- MOV           RX/SP <- RY/SP
 
--- MOV SP RX    ADDRBASE <- BASE   Format: < inst(6) |      BASE (9)     | 1 >
--- MOV RX RY    RX <- RY           Format: < inst(6) | RX(3) | RY(3) |x| 000 >
--- MOV RX SP    RX <- SP           Format: < inst(6) | RX(3) | xxx | x | 010 >
--- MOV SP RX    SP <- RX           Format: < inst(6) | RX(3) |   xxxx  | 110 >
--- MOV SP RX    SP <- RX           Format: < inst(6) | RX(3) | xxx | x | 100 >
+-- MOV RX RY    RX <- RY           Format: < inst(6) | RX(3) | RY(3) | xx | x0 >
+-- MOV RX SP    RX <- SP         Format: < inst(6) | RX(3) | xxx | xx | 01 >
+-- MOV SP RX    SP <- RX         Format: < inst(6) | RX(3) | xxx | xx | 11 >
 
 --========================================================================
-         IF((IR(15 DOWNTO 10) = MOV) and (IR(0) = "1")) THEN
-
-				ADDRBASE := IR(9 downto 1) 
-				
-            state := fetch;
-				
-			END IF;
-
-			IF((IR(15 DOWNTO 10) = MOV) and (IR(2 downto 1) = "00")) THEN
+         IF((IR(15 DOWNTO 10) = MOV) and (IR(0) = '0')) THEN
 
 				M4 := Reg(RY);
 				selM2 := sM4;
@@ -487,7 +464,7 @@ begin
 				
 			END IF;	
 			
-			IF((IR(15 DOWNTO 10) = MOV) and (IR(2 DOWNTO 1) = "01")) THEN
+			IF((IR(15 DOWNTO 10) = MOV) and (IR(1 DOWNTO 0) = "01")) THEN
 
 				selM2 := sSP;
 				LoadReg(RX) := '1';
@@ -495,18 +472,11 @@ begin
 				
 			END IF;
 				
-			IF((IR(15 DOWNTO 10) = MOV) and (IR(2 DOWNTO 1) = "11")) THEN
+			IF((IR(15 DOWNTO 10) = MOV) and (IR(1 DOWNTO 0) = "11")) THEN
 				
 				M4 := Reg(RX);
 				LoadSP := '1';
             state := fetch;	
-				
-         END IF;
-			
-			IF((IR(15 DOWNTO 10) = MOV) and (IR(2 DOWNTO 1) = "10")) THEN
-				
-				M4 := Reg(RX);
-				ADDRBASE := M4(15 donwto 7)
 				
          END IF;
 
@@ -780,6 +750,20 @@ begin
             state := fetch;
             PONTO <= "101";
          END IF;
+
+--========================================================================
+-- SOUNDI
+--========================================================================
+IF(IR(15 DOWNTO 13) = SOUNDI) THEN -- Todas as Intruções de Sound tem o mesmo OP-Code
+
+            SB_isInstruction <= '1';
+
+            IF( IR(12 DOWNTO 10) = "010")
+               incSP <= '1';
+            END IF;
+            state := fetch;
+         END IF;
+
 
 -- XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
 
