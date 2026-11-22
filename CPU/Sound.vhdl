@@ -26,8 +26,10 @@ ENTITY SB IS
 			audio_out      : OUT STD_LOGIC_VECTOR(3 DOWNTO 0);
 
 		-- Controle
-			IS_Instruction : IN  STD_LOGIC
-	);
+			IS_Instruction : IN  STD_LOGIC;
+			
+		-- DEBUG
+			LED_OUT : OUT STD_LOGIC_VECTOR(3 DOWNTO 0));
 END SB;
 
 ARCHITECTURE behavior OF SB IS
@@ -374,6 +376,7 @@ BEGIN
 		play_o1   <= '0';
 		play_o2   <= '0';
 		audio_out <= "1000";                 -- nivel medio (silencio)
+			led_OUT   <= "1000";
 
 	elsif rising_edge(clock_1Mhz) then
 
@@ -389,8 +392,10 @@ BEGIN
 				sum := resize(unsigned(wave_c1), 6) + resize(unsigned(wave_c2), 6)
 				     + resize(unsigned(wave_c3), 6) + resize(unsigned(wave_c4), 6);
 				audio_out <= std_logic_vector(sum(5 DOWNTO 2));
+				led_OUT <= std_logic_vector(sum(5 DOWNTO 2));
 			else
 				audio_out <= "1000";         -- nivel medio quando parado
+				led_OUT <= "1000";
 			end if;
 
 		end if;
