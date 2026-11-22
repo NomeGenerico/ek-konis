@@ -28,13 +28,12 @@ entity cpu is
       halt_req : in  STD_LOGIC;
 
       PC_data  : out STD_LOGIC_VECTOR(15 downto 0);
-      break    : out STD_LOGIC
+      break    : out STD_LOGIC;
 
       -- Sound Board
-      SB_dataIN :  STD_LOGIC_VECTOR(15 downto 0);
-      SB_dataOUT :  STD_LOGIC_VECTOR(15 downto 0);
-      SB_isInstruction : out bit;
-   );
+      SB_DATAIN : in STD_LOGIC_VECTOR(15 downto 0);
+      SB_DATAOUT : out  STD_LOGIC_VECTOR(15 downto 0);
+      SB_isInstruction : out STD_LOGIC);
 end cpu;
 
 ARCHITECTURE main of cpu is
@@ -101,11 +100,11 @@ ARCHITECTURE main of cpu is
    CONSTANT BREAKP      : STD_LOGIC_VECTOR(5 downto 0) := "001110";    -- BREAK POINT    -- Switch to manual clock                  Format: < inst(6) | xxxxxxxxxx >
 
    -- SOUND INSTRUCTIONS --
-   CONSTANT SOUND : STD_LOGIC_VECTOR = "101"
+   CONSTANT SOUND : STD_LOGIC_VECTOR (2 DOWNTO 0) := "101";   -- IR(15..13) = "101"; IR(12..10) = sub-opcode (tratado na Placa de Som)
    -- Sound Instructions:
    CONSTANT START_Playback : STD_LOGIC_VECTOR (2 DOWNTO 0) := "000";
 	CONSTANT STOP_Playback  : STD_LOGIC_VECTOR (2 DOWNTO 0) := "001";
-	CONSTANT Imed_PLAY      : STD_LOGIC_VECTOR (2 DOWNTO 0) := "010";
+	CONSTANT SOUNDI      : STD_LOGIC_VECTOR (2 DOWNTO 0) := "010";
 
 
 
@@ -230,6 +229,10 @@ begin
        -- Novo na Versao 3
       HALT_ack <= '0';
 
+      -- Placa de som
+      SB_isInstruction <= '0';
+      SB_DATAOUT       <= (others => '0');
+
    elsif(clk'event and clk = '1') then
 
       if(LoadIR = '1')   then IR := Mem;             end if;
@@ -318,8 +321,9 @@ begin
       -- Novo na Versao 3: para escrever PC no LCD da placa
       PC_data <= PC;
 
-      -- Novo Placa de som:
-      SB_dataOUT <= MEM
+      -- Placa de som:
+      SB_DATAOUT       <= MEM;   -- barramento de dados registrado: palavra de instrucao em decode, palavra de dados em exec
+      SB_isInstruction <= '0';   -- vira pulso de 1 clock (a ultima atribuicao no processo e' a que vale)
 
       case state is
 --************************************************************************
@@ -483,7 +487,7 @@ begin
 --========================================================================
 -- ARITH OPERATION ('INC' NOT INCLUDED)          RX <- RY (?) RZ
 --========================================================================
-         IF(IR(15 DOWNTO 14) = ARITH AND IR(13 DOWNTO 10) /= INC) THEN
+         IF(IR(15 DOWNTO 14) = ARITH AND IR(13) = '0' AND IR(13 DOWNTO 10) /= INC) THEN   -- IR(13)='0': exclui opcodes de som (101xxx)
 				
 				M3 := Reg(RY);
 				M4 := Reg(RZ);
@@ -752,16 +756,22 @@ begin
          END IF;
 
 --========================================================================
--- SOUNDI
+-- SOUND   Todas as instrucoes de som tem IR(15..13) = "101"; sub-opcode em IR(12..10)
+--         Protocolo com a Placa de Som (SB):
+--           clk D   (decode): SB_DATAOUT <- IR (palavra de instrucao); endereca a palavra de dados (M1 <- PC)
+--           clk D+1 (exec)  : SB_DATAOUT <- palavra de dados; SB_isInstruction sobe por 1 clock
+--           A SB le: last_sb_in = instrucao, SB_DataIn = dado, na borda de subida de IS_Instruction
 --========================================================================
-IF(IR(15 DOWNTO 13) = SOUNDI) THEN -- Todas as Intruções de Sound tem o mesmo OP-Code
+         IF(IR(15 DOWNTO 13) = SOUND) THEN
 
-            SB_isInstruction <= '1';
+            M1 <= PC;                           -- palavra de dados (so' usada por Imed_PLAY)
+            RW <= '0';
 
-            IF( IR(12 DOWNTO 10) = "010")
-               incSP <= '1';
+            IF(IR(12 DOWNTO 10) = "010") THEN   -- Imed_PLAY tem uma palavra de dados: pula-la
+               IncPC := '1';
             END IF;
-            state := fetch;
+
+            state := exec;                      -- exec levanta SB_isInstruction
          END IF;
 
 
@@ -785,6 +795,14 @@ IF(IR(15 DOWNTO 13) = SOUNDI) THEN -- Todas as Intruções de Sound tem o mesmo 
 
          when exec =>
             PONTO <= "100";
+--========================================================================
+-- EXEC SOUND          sobe SB_isInstruction por 1 clock (SB_DATAOUT ja' leva o dado)
+--========================================================================
+         IF(IR(15 DOWNTO 13) = SOUND) THEN
+            SB_isInstruction <= '1';
+            state := fetch;
+         END IF;
+
 --========================================================================
 -- EXEC LOAD DIReto           RX <- M[END]
 --========================================================================
