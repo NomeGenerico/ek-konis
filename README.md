@@ -8,7 +8,7 @@ Repo for libraries in development targeting the **ICMC Processor**:
 
 Students:
 Ricardo Mozart Torres (16899607)
-Mateus Bastazini (16391529)
+Mateus Bastazini (16891529)
 Otávio Augusto Biasi (15004590)
 
 ## Linker
