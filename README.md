@@ -84,4 +84,16 @@ Everything you need:
 
 Implementation of CPU: 
 
-Compared to the reference implementation of the CPU, this one has several speedups, it reduces the cicle count of instructions like push, pop, call, rts, etc. Bringing them all to a constant of two cicles per instructions. The only not yet optimized were specificaly load 
+Compared to the reference implementation of the CPU, this one has several speedups, it reduces the cicle count of instructions like push, pop, call, rts, etc. Bringing them all to a constant of two cicles per instructions. The only instructions not yet optimized to two cycles were: load, store, trs. specificaly for load and store, they rely on two memory reads plus another write or read to memory, it is impossible to do so without changing how the CPU reads RAM. Allowing it to read 32 bits, would fix such a problem. RTS was optimized from 4 cicles to 3, but could likely be spedup further by making call store an already incremented PC. 
+
+Another instruction that also does not have a 2 cycle count is the newly created SOUNDI instruction. It relies on sending two words of data to a separate device in the FPGA project. 
+
+Implementation of the Sound-Card:
+
+At the current moment, the sound card has a few main parts:
+
+A frequency generator : Recieves the number from the CPU and will generate a sine wave with that freaquency. It has a resolution of 0.1 hz + a small <1% error. It works by adding a number to a 24 bit register every single clock cicle. from how far along the counter is until it overflows, we infer where in the wave we should be at the moment and perform a lookup. So the waveform is fully customizable as well. 
+
+It also has a "Maquina de Controle", this way it can handle its own operation completly independent of the CPU, it also reduces the number of new instructions needed to be registred in the CPU it self, as everything falls under a single SOUND instruction for the CPU. 
+
+A mixer: it blends the signals from different chanels 
