@@ -80,3 +80,8 @@ Everything you need:
 - Create objects *(you'll still write the constructor yourself 😔)*
 - Dispatch behaviour functions easily
 - Store custom data per object, accessible by its functions via a Object ID
+
+
+Implementation of CPU: 
+
+Compared to the reference implementation of the CPU, this one has several speedups, it reduces the cicle count of instructions like push, pop, call, rts, etc. Bringing them all to a constant of two cicles per instructions. The only not yet optimized were specificaly load 
